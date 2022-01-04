@@ -13,8 +13,11 @@ import {
   getSettingFromStorage
 } from "./setting";
 
-
 //init environment var======================================================================\
+var deviation = 50;
+var isNewWord = false;
+var oldClientX = 0;
+var oldClientY = 0;
 var currentSetting = {};
 var tooltipContainer;
 var clientX = 0;
@@ -34,8 +37,6 @@ var rtlLangList = [
   "ur", //Urdu
   "yi", //Yiddish
 ]; //right to left language system list
-
-
 
 //tooltip core======================================================================
 //tooltip init
@@ -64,17 +65,6 @@ $(document).ready(function() {
   });
 });
 
-
-
-//determineTooltipShowHide based on hover, check mouse over word on every 700ms
-setInterval(async function() {
-  // only work when tab is activated and when mousemove and no selected text
-  if (!selectedText && document.visibilityState == "visible" && mouseMoved && settingLoaded && currentSetting["translateWhen"].includes("mouseover")) {
-    let word = getMouseOverWord(clientX, clientY);
-    await processWord(word, "mouseover");
-  }
-}, 700);
-
 //determineTooltipShowHide based on selection
 enableSelectionEndEvent(); //set mouse drag text selection event
 document.addEventListener("selectionEnd", async function(event) {
@@ -94,9 +84,13 @@ async function processWord(word, actionType) {
     setTooltipPosition();
     var response = await translate(word);
 
+    oldClientX = clientX;
+    oldClientY = clientY;
+
     //if respond text is not empty, process text
     //else, hide
     if (response.translatedText != "") {
+      isNewWord = true;
       //if tooltip is on or activation key is pressed, show tooltip
       if (currentSetting["useTooltip"] == "true" || keyDownList[currentSetting["keyDownTooltip"]]) {
         applyLangAlignment(response.targetLang);
@@ -169,7 +163,10 @@ function filterWord(word) {
 }
 
 function hideTooltip() {
-  tooltipContainer.tooltip("hide");
+  // avoid NPE on PDF files
+  if(tooltipContainer && tooltipContainer.tooltip) {
+    tooltipContainer.tooltip("hide");
+  }
 }
 
 function setTooltipPosition() {
@@ -209,11 +206,21 @@ $(document).mousemove(function(event) {
   clientY = event.clientY;
   mouseTarget = event.target;
   mouseMoved = true;
-  setTooltipPosition();
+  // should add a new settings for this?
+  //setTooltipPosition();
+
+  if(isNewWord && 
+    (oldClientX - deviation > clientX 
+      || oldClientX + deviation < clientX 
+      || oldClientY - deviation > clientY 
+      || oldClientY + deviation < clientY)) {
+    isNewWord = false;
+    hideTooltip();
+  }
 });
 //detect activation hold key pressed
 $(document).keydown(function(e) {
-  if ((e.keyCode == 65 || e.keyCode == 70) && e.ctrlKey) { //user pressed ctrl+f  ctrl+a, hide tooltip
+  if ((e.keyCode == 65 || e.keyCode == 70) && e.ctrlKey || e.keyCode === 27) { //user pressed ctrl+f  ctrl+a, ESC, hide tooltip
     mouseMoved = false;
     hideTooltip();
   } else {
@@ -231,6 +238,18 @@ $(document).keyup(function(e) {
     keyDownList[e.which] = false;
   }
 });
+
+// hide tooltip when scroll
+window.addEventListener('mousewheel', function(event) {
+  mouseMoved = false;
+  hideTooltip();
+});
+
+// hide tooltip when mousedown
+document.addEventListener("mousedown", function(event) {
+  mouseMoved = false;
+  hideTooltip();
+}, false);
 
 //detect tab switching to reset env
 window.addEventListener('blur', function(event) {
@@ -299,6 +318,7 @@ chrome.storage.onChanged.addListener(function(changes, namespace) {
   }
 });
 
+// remove opacity and add extra padding
 function applyStyleSetting(setting) {
   //apply css
   style.html(`
@@ -307,6 +327,10 @@ function applyStyleSetting(setting) {
     }
     .bootstrapiso .tooltip-inner {
       max-width: ` + setting["tooltipWidth"] + `px;
+      padding: 5px 15px 5px 15px;
+    }
+    .bootstrapiso .tooltip.show {
+      opacity: 1
     }
     `);
 }

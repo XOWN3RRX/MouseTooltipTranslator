@@ -5,11 +5,6 @@
 let lastSelectedText = '';
 
 export function enableSelectionEndEvent() {
-    // Listen selection change every 700 ms. It covers keyboard selection and selection from menu (select all option)
-    document.addEventListener("selectionchange", debounce(event => {
-        triggerSelectionEnd();
-    }, 700), false);
-
     // Trigger on mouse up immediately. Helps reduce 700 ms delay during mouse selection.
     document.addEventListener("mouseup", function(event) {
         triggerSelectionEnd();
