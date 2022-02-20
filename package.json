@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "watch": "webpack --mode=development --watch --config config/webpack.config.js",
-    "build": "webpack --mode=production --config config/webpack.config.js"
+    "build": "webpack --mode=production --watch --config config/webpack.config.js"
   },
   "devDependencies": {
     "@mdi/font": "^5.9.55",

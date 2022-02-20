@@ -182,7 +182,7 @@ async function doTranslate(request, sendResponse) {
 
   //prepare params
   if (currentSetting["translatorVendor"] == "google") {
-    translatorUrl = "https://translate.googleapis.com/translate_a/t?client=dict-chrome-ex&";
+    translatorUrl = "https://clients5.google.com/translate_a/single?dj=1&dt=t&dt=sp&dt=ld&dt=bd&client=dict-chrome-ex&";
     params = {
       q: request.word,
       sl: currentSetting["translateSource"], //source lang

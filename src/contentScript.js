@@ -15,7 +15,6 @@ import {
 
 //init environment var======================================================================\
 var deviation = 50;
-var isNewWord = false;
 var oldClientX = 0;
 var oldClientY = 0;
 var currentSetting = {};
@@ -23,7 +22,6 @@ var tooltipContainer;
 var clientX = 0;
 var clientY = 0;
 var mouseTarget = null;
-var activatedWord = null;
 var mouseMoved = false;
 var settingLoaded = false;
 var keyDownList = {}; //use key down for enable translation partially
@@ -79,23 +77,24 @@ document.addEventListener("selectionEnd", async function(event) {
 async function processWord(word, actionType) {
   word = filterWord(word); //filter out one that is url,over 1000length,no normal char
 
-  if (word && activatedWord != word) { //show tooltip, if current word is changed and word is not none
-    activatedWord = word;
+  if (word) { //show tooltip, if current word is changed and word is not none
     setTooltipPosition();
-    var response = await translate(word);
 
     oldClientX = clientX;
     oldClientY = clientY;
 
+    changeMouseCursor('progress');
+    var response = await translate(word);
+    changeMouseCursor('auto');
+
     //if respond text is not empty, process text
     //else, hide
     if (response.translatedText != "") {
-      isNewWord = true;
       //if tooltip is on or activation key is pressed, show tooltip
       if (currentSetting["useTooltip"] == "true" || keyDownList[currentSetting["keyDownTooltip"]]) {
         applyLangAlignment(response.targetLang);
         tooltipContainer.attr('data-original-title', response.translatedText); //place text on tooltip
-        tooltipContainer.tooltip("show");
+        showTooltip();
 
         //if record trigger is activated, do record
         if (currentSetting["historyRecordActions"].includes(actionType)) {
@@ -110,8 +109,7 @@ async function processWord(word, actionType) {
       hideTooltip();
     }
 
-  } else if (!word && activatedWord) { //hide tooltip, if activated word exist and current word is none
-    activatedWord = null;
+  } else if (!word) { //hide tooltip, if activated word exist and current word is none
     hideTooltip();
   }
 }
@@ -169,25 +167,41 @@ function hideTooltip() {
   }
 }
 
-function setTooltipPosition() {
-  if (activatedWord != null) {
-    tooltipContainer.css("transform", "translate(" + clientX + "px," + clientY + "px)");
+function changeMouseCursor(type) {
+  document.body.style.cursor = type;
+}
+
+function showTooltip() {
+  // avoid NPE on PDF files
+  if(tooltipContainer && tooltipContainer.tooltip) {
+    tooltipContainer.tooltip("show");
   }
 }
 
-async function translate(word) {
-  var response = await translateSentence(word, currentSetting["translateTarget"]);
+function setTooltipPosition() {
+  tooltipContainer.css("transform", "translate(" + clientX + "px," + clientY + "px)");
+}
 
-  //if lang are same, reverse translate
-  if (currentSetting["translateTarget"] == response.sourceLang) {
-    if (currentSetting["translateReverseTarget"] != "null") {
-      response = await translateSentence(word, currentSetting["translateReverseTarget"]);
-    } else {
-      response.translatedText = "";
+async function translate(word) {
+  try {
+    var response = await translateSentence(word, currentSetting["translateTarget"]);
+  
+    //if lang are same, reverse translate
+    if (currentSetting["translateTarget"] == response.sourceLang) {
+      if (currentSetting["translateReverseTarget"] != "null") {
+        response = await translateSentence(word, currentSetting["translateReverseTarget"]);
+      } else {
+        response.translatedText = "";
+      }
+    }
+  
+    return response;
+  }
+  catch {
+    return {
+      translatedText : ''
     }
   }
-
-  return response;
 }
 
 function applyLangAlignment(lang) {
@@ -206,17 +220,6 @@ $(document).mousemove(function(event) {
   clientY = event.clientY;
   mouseTarget = event.target;
   mouseMoved = true;
-  // should add a new settings for this?
-  //setTooltipPosition();
-
-  if(isNewWord && 
-    (oldClientX - deviation > clientX 
-      || oldClientX + deviation < clientX 
-      || oldClientY - deviation > clientY 
-      || oldClientY + deviation < clientY)) {
-    isNewWord = false;
-    hideTooltip();
-  }
 });
 //detect activation hold key pressed
 $(document).keydown(function(e) {
@@ -226,7 +229,6 @@ $(document).keydown(function(e) {
   } else {
     if ([currentSetting["keyDownTooltip"], currentSetting["keyDownTTS"]].includes(e.which.toString()) && keyDownList[e.which] != true) { // check activation hold key pressed, run tooltip again with key down value
       keyDownList[e.which] = true;
-      activatedWord = null; //restart word process
       if (selectedText != "") { //restart select if selected value exist
         processWord(selectedText, "select");
       }
@@ -256,7 +258,6 @@ window.addEventListener('blur', function(event) {
   hideTooltip();
   keyDownList = {}; //reset key press
   mouseMoved = false;
-  activatedWord = null; //restart word process
   selectedText = "";
 });
 
